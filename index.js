@@ -10,7 +10,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 //middleware
 app.use(express.json())
 app.use(cors({
-  origin: ["http://localhost:5174"],
+  origin: ["http://localhost:5173"],
   credentials: true
 }))
 app.use(cookieParser())
@@ -30,7 +30,7 @@ const client = new MongoClient(uri, {
 //middleware 
 const verifyToken =(req, res,next)=>{
   const token =req?.cookies?.token
-  console.log("token int the middleware", token);
+  // console.log("token int the middleware", token);
   //jodi token na pai
   if(!token){
     return res.status(401).send({message:"unAuthorized access"})
@@ -51,6 +51,7 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     client.connect();
     const foodCollection = client.db("shareFoodDB").collection("foodCollection")
+    const foodRequestCollection=client.db("shareFoodDB").collection("foodRequestCollection")
     
     //auth related api
     app.post("/jwt", async (req, res) => {
@@ -79,15 +80,50 @@ async function run() {
     })
 
     //all foods get api
-    app.get("/getFood", verifyToken, async (req, res) => {
-      console.log("cook cookies",req.cookies);
-      const cursor = foodCollection.find()
+    app.get("/getFood", async (req, res) => {
+
+      let sortObj={}
+     let queryObj = {}
+     
+     const foodName =req.query.foodName 
+     const sortField= req.query.sortField
+     const sortOrder =req.query.sortOrder 
+
+     const limit = Number(req.query.limit)
+  
+    //filter
+    
+      if(foodName){
+      queryObj.foodName={
+        $regex:foodName,
+        $options: "i",
+      }
+     }
+
+     //sorting
+     if (sortField && sortOrder) {
+      sortObj[sortField] = sortOrder ;
+    }
+      const cursor = foodCollection.find(queryObj).sort(sortObj).limit(limit)
       const result = await cursor.toArray()
+      // const expiredDateValue = result.map((food)=>({
+      //   ...food,
+      //   expiredDate: new Date(food.expiredDate).toDateString(),
+      // }))
       res.send(result)
     })
 
+    //featuredFood 
+    app.get("/featuredFood", async(req, res)=>{
+      const result = await foodCollection.find({}).sort({foodQuantity:-1}).toArray()
+      res.send(result)
+    })
+
+
+
+
     //find single food 
-    app.get("/getFood/:id", verifyToken, async (req, res) => {
+    app.get("/getFood/:id", async (req, res) => {
       console.log(req.cookies);
       const id = req.params.id
       const query = { _id: new ObjectId(id) }
@@ -95,7 +131,117 @@ async function run() {
       res.send(result)
     })
 
+   //manage get good 
+   app.get('/manageFood/:email', async(req, res)=>{
+    const cursor = foodCollection.find({donatorEmail:req.params.email})
+    const manageFoods = await cursor.toArray()
+    res.send(manageFoods)
+   })
+    
+    //foodRequestCollection post(create) api
+    app.post("/requestFood", async (req, res) => {
+      const food = req.body;
+      const result = await foodRequestCollection.insertOne(food)
+      res.send(result)
+    })
 
+ ////get foodRequestCollection  api
+app.get("/requestFood", async(req, res)=>{
+  const cursor = foodRequestCollection.find()
+  const result = await cursor.toArray()
+  res.send(result)
+})
+
+//manageSingleFood 
+app.get("/requestFood/:id", async(req,res)=>{
+  const id = req.params.id
+  const filter ={requestFoodId : id}
+  const result = await foodRequestCollection.find(filter).toArray()
+  res.send(result)
+
+})
+
+//getUser request food 
+app.get("/getUserRequestFood", async(req,res)=>{
+  let query ={}
+  if(req.query?.email){
+    query={UserEmail: req.query.email}
+  }
+  const result = await foodRequestCollection.find(query).toArray()
+  res.send(result)
+})
+
+
+
+//food status update (delivered)
+app.patch("/requestFoodDelivered/:id", async(req, res)=>{
+  const id= req.params.id
+  const filter ={_id:new ObjectId(id)}
+  const updateReq={
+    $set:{
+      isDelivered: true
+    }
+  }
+  const result =await foodRequestCollection.updateOne(filter, updateReq)
+  res.send(result)
+})
+//update manage section
+app.patch('/updateManageFood/:id', async(req,res)=>{
+  const id= req.params.id
+  const filter ={_id : new ObjectId(id)}
+  const query =req.body
+  const updateFood ={
+    $set:{
+      foodName:query.foodName,
+      foodImage:query.foodImage,
+      foodQuantity:query.foodQuantity,
+      pickupLocation:query.pickupLocation,
+      expiredDate:query.expiredDate,
+      additionalNotes:query.additionalNotes,
+      foodStatus:query.foodStatus,
+    }
+  }
+  const result =await foodCollection.updateOne(filter, updateFood)
+  if(result.modifiedCount ==1){
+    const reqData= {requestFoodId : id}
+    const exist = await foodRequestCollection.findOne(reqData)
+    if(exist){
+      const reqUpdateDoc ={
+        $set:{
+          foodName:query.foodName,
+        foodImage:query.foodImage,
+        pickupLocation:query.pickupLocation,
+        expiredDate:query.expiredDate,
+        foodStatus:query.foodStatus
+        }
+      }
+      const requestResult = await foodRequestCollection.findOne(reqData, reqUpdateDoc)
+      res.send(requestResult)
+    }else{
+      res.send(result)
+    }
+    }
+  
+})
+
+
+
+//request delete 
+app.delete("/requestCancel/:id", async(req,res)=>{
+  const id =req.params.id 
+  const query ={_id : new ObjectId(id)}
+  const result = await foodRequestCollection.deleteOne(query)
+  res.send(result)
+})
+
+
+//all food delete buuton
+app.delete("/getFood/:id", async(req, res)=>{
+  const id = req.params.id
+  const query ={_id : new ObjectId( id)}
+  const result = await foodCollection.deleteOne(query)
+  res.send(result)
+})
 
     // Send a ping to confirm a successful connection
     client.db("admin").command({ ping: 1 });
