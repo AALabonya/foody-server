@@ -10,7 +10,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 //middleware
 app.use(express.json())
 app.use(cors({
-  origin: ["http://localhost:5173"],
+  origin: ["http://localhost:5174"],
   credentials: true
 }))
 app.use(cookieParser())
@@ -78,7 +78,7 @@ async function run() {
       const result = await foodCollection.insertOne(food)
       res.send(result)
     })
-
+    
     //all foods get api
     app.get("/getFood", async (req, res) => {
 
@@ -89,7 +89,7 @@ async function run() {
      const sortField= req.query.sortField
      const sortOrder =req.query.sortOrder 
 
-     const limit = Number(req.query.limit)
+    //  const limit = Number(req.query.limit)
   
     //filter
     
@@ -104,7 +104,7 @@ async function run() {
      if (sortField && sortOrder) {
       sortObj[sortField] = sortOrder ;
     }
-      const cursor = foodCollection.find(queryObj).sort(sortObj).limit(limit)
+      const cursor = foodCollection.find(queryObj).sort(sortObj)
       const result = await cursor.toArray()
       // const expiredDateValue = result.map((food)=>({
       //   ...food,
@@ -119,16 +119,22 @@ async function run() {
       res.send(result)
     })
 
-
-
-
     //find single food 
     app.get("/getFood/:id", async (req, res) => {
-      console.log(req.cookies);
+      // console.log(req.cookies);
       const id = req.params.id
       const query = { _id: new ObjectId(id) }
       const result = await foodCollection.findOne(query)
       res.send(result)
+      console.log(result);
+    })
+    app.get("/getFoods/:id", async (req, res) => {
+      // console.log(req.cookies);
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await foodCollection.findOne(query)
+      res.send(result)
+      console.log(result);
     })
 
    //manage get good 
@@ -185,8 +191,8 @@ app.patch("/requestFoodDelivered/:id", async(req, res)=>{
   const result =await foodRequestCollection.updateOne(filter, updateReq)
   res.send(result)
 })
-//update manage section
-app.patch('/updateManageFood/:id', async(req,res)=>{
+// update manage section
+app.patch('/updateFood/:id', async(req,res)=>{
   const id= req.params.id
   const filter ={_id : new ObjectId(id)}
   const query =req.body
