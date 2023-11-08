@@ -10,7 +10,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 //middleware
 app.use(express.json())
 app.use(cors({
-  origin: ["http://localhost:5174"],
+  origin: ["http://localhost:5175"],
   credentials: true
 }))
 app.use(cookieParser())
@@ -39,7 +39,7 @@ const verifyToken =(req, res,next)=>{
     if(error){
       return res.status(401).send({message:"unAuthorized access"})
     }
-    res.user = decoded
+   req.user = decoded
     next()
   })
 }
@@ -106,10 +106,6 @@ async function run() {
     }
       const cursor = foodCollection.find(queryObj).sort(sortObj)
       const result = await cursor.toArray()
-      // const expiredDateValue = result.map((food)=>({
-      //   ...food,
-      //   expiredDate: new Date(food.expiredDate).toDateString(),
-      // }))
       res.send(result)
     })
 
@@ -138,7 +134,10 @@ async function run() {
     })
 
    //manage get good 
-   app.get('/manageFood/:email', async(req, res)=>{
+   app.get('/manageFood/:email', verifyToken, async(req, res)=>{
+    if(req.params.email!==req.user.email){
+      return res.status(403).send({message: "forbidden access"})
+    }
     const cursor = foodCollection.find({donatorEmail:req.params.email})
     const manageFoods = await cursor.toArray()
     res.send(manageFoods)
@@ -152,7 +151,7 @@ async function run() {
     })
 
  ////get foodRequestCollection  api
-app.get("/requestFood", async(req, res)=>{
+app.get("/requestFood",  async(req, res)=>{
   const cursor = foodRequestCollection.find()
   const result = await cursor.toArray()
   res.send(result)
@@ -168,7 +167,13 @@ app.get("/requestFood/:id", async(req,res)=>{
 })
 
 //getUser request food 
-app.get("/getUserRequestFood", async(req,res)=>{
+app.get("/getUserRequestFood", verifyToken, async(req,res)=>{
+     
+  if(req.user.email !== req.query.email){
+    return res.status(403).send({message: "forbidden access"})
+  }
+
+
   let query ={}
   if(req.query?.email){
     query={UserEmail: req.query.email}
@@ -204,7 +209,7 @@ app.patch('/updateFood/:id', async(req,res)=>{
       pickupLocation:query.pickupLocation,
       expiredDate:query.expiredDate,
       additionalNotes:query.additionalNotes,
-      foodStatus:query.foodStatus,
+      
     }
   }
   const result =await foodCollection.updateOne(filter, updateFood)
@@ -218,7 +223,7 @@ app.patch('/updateFood/:id', async(req,res)=>{
         foodImage:query.foodImage,
         pickupLocation:query.pickupLocation,
         expiredDate:query.expiredDate,
-        foodStatus:query.foodStatus
+        
         }
       }
       const requestResult = await foodRequestCollection.findOne(reqData, reqUpdateDoc)
@@ -227,10 +232,9 @@ app.patch('/updateFood/:id', async(req,res)=>{
       res.send(result)
     }
     }
-  
 })
-
-
+//foodStatus:query.foodStatus,
+// foodStatus:query.foodStatus
 
 //request delete 
 app.delete("/requestCancel/:id", async(req,res)=>{
