@@ -34,8 +34,7 @@ const client = new MongoClient(uri, {
 //middleware 
 const verifyToken = (req, res, next) => {
   const token = req?.cookies?.token
-  // console.log("token int the middleware", token);
-  //jodi token na pai
+
   if (!token) {
     return res.status(401).send({ message: "unAuthorized access" })
   }
@@ -92,7 +91,7 @@ async function run() {
       const sortField = req.query.sortField
       const sortOrder = req.query.sortOrder
 
-      //  const limit = Number(req.query.limit)
+  
 
       //filter
 
@@ -233,8 +232,7 @@ async function run() {
       }
 
     })
-    //foodStatus:query.foodStatus,
-    // foodStatus:query.foodStatus
+  
 
     //request delete 
     app.delete("/requestCancel/:id", async (req, res) => {
